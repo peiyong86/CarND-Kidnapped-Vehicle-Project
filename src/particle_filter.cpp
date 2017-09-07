@@ -76,17 +76,19 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	}
 }
 
+
+
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
-	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
+	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the
 	//   observed measurement to this particular landmark.
-	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
+	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to
 	//   implement this method and use it as a helper during the updateWeights phase.
 	for(int i = 0; i<observations.size(); i++){
 		int index = 0;
-		double mindis = 99999999.0;
+		double mindis = dist(observations[i].x, observations[i].y, predicted[0].x, predicted[0].y);
 		double dist_ = 0;
 		for(int j = 0; j<predicted.size(); j++){
-			dist_ = dist(observations[i].x, observations[i].y, predicted[i].x, predicted[i].y);
+			dist_ = dist(observations[i].x, observations[i].y, predicted[j].x, predicted[j].y);
 			if(dist_ < mindis){
 				mindis = dist_;
 				index = j;
@@ -96,7 +98,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 	}
 }
 
-void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
+void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		std::vector<LandmarkObs> observations, Map map_landmarks) {
 	// TODO: Update the weights of each particle using a mult-variate Gaussian distribution. You can read
 	//   more about this distribution here: https://en.wikipedia.org/wiki/Multivariate_normal_distribution
@@ -105,7 +107,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   Keep in mind that this transformation requires both rotation AND translation (but no scaling).
 	//   The following is a good resource for the theory:
 	//   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
-	//   and the following is a good resource for the actual equation to implement (look at equation 
+	//   and the following is a good resource for the actual equation to implement (look at equation
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 	for(int i = 0; i < num_particles; i++) {
@@ -135,24 +137,26 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				index++;
 			}
 		}
-		dataAssociation(observations_copy, landmarks);
+		dataAssociation(landmarks, observations_copy);
 
 		double prob = 1.0;
 		double exponent;
 		double gaussian = 0;
 		double gauss_norm = 1.0 / sqrt(2.0 * M_PI * std_landmark[0] * std_landmark[1]);
-        for(int j = 0; j < landmarks.size(); j++){
-			exponent = pow(observations_copy[landmarks[j].id].x - landmarks[j].x, 2)/(2*pow(std_landmark[0], 2));
-			exponent += pow(observations_copy[landmarks[j].id].y - landmarks[j].y, 2)/(2*pow(std_landmark[1], 2));
+		for (int j = 0; j < observations_copy.size(); j++){
+			exponent = pow(observations_copy[j].x - landmarks[observations_copy[j].id].x, 2)/(2*pow(std_landmark[0], 2));
+			exponent += pow(observations_copy[j].y - landmarks[observations_copy[j].id].y, 2)/(2*pow(std_landmark[1], 2));
 			gaussian = exp(-exponent)*gauss_norm;
 			prob *= gaussian;
         }
 		weights[i] = prob;
+        particles[i].weight = prob;
 	}
 }
 
+
 void ParticleFilter::resample() {
-	// TODO: Resample particles with replacement with probability proportional to their weight. 
+	// TODO: Resample particles with replacement with probability proportional to their weight.
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
     double w_sum = 0, w_max=weights[0];
@@ -164,6 +168,7 @@ void ParticleFilter::resample() {
     }
 	for(int i = 0; i < weights.size(); i++) {
 		weights[i] /= w_sum;
+		particles[i].weight /= w_sum;
 	}
 	w_max /= w_sum;
 
@@ -185,7 +190,9 @@ void ParticleFilter::resample() {
 			step += randomdistri(gen);
 		}
 	}
+    particles = new_particles;
 }
+
 
 Particle ParticleFilter::SetAssociations(Particle particle, std::vector<int> associations, std::vector<double> sense_x, std::vector<double> sense_y)
 {
